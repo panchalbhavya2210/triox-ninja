@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "NVIDIA_API_KEY is not configured on the server." }), { status: 500 });
     }
 
-    // Default to Llama-3-70b if no model is provided
-    const selectedModel = model || "meta/llama3-70b-instruct";
+    // Default to Llama-3.1-70b if no model is provided
+    const selectedModel = model || "meta/llama-3.1-70b-instruct";
 
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",

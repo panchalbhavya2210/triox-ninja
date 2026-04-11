@@ -5,6 +5,11 @@ export type Message = {
   role: Role;
   content: string;
   createdAt: number;
+  model?: string;
+  groupId?: string;
+  latency?: number;
+  tokens?: number;
+  isStarred?: boolean;
 };
 
 export type Chat = {
@@ -13,4 +18,5 @@ export type Chat = {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+  isPinned?: boolean;
 };
