@@ -39,8 +39,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-lg overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
+    <div className="fixed left-0 top-0 inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm max-h-dvh h-dvh overflow-y-hidden">
+      <div className="bg-card h-dvh  overflow-y-scroll w-full max-w-md rounded-2xl border border-border shadow-lg overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
           <h2 className="text-lg font-semibold tracking-tight">
             Personalization
@@ -80,7 +80,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <h3 className="text-sm font-medium text-foreground">
               Corner Radius
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {CORNERS.map((corner) => (
                 <button
                   key={corner.name}
@@ -102,7 +102,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <h3 className="text-sm font-medium text-foreground">
               Persona Gallery
             </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {PERSONA_LIBRARY.map((persona) => (
                 <button
                   key={persona.id}
@@ -138,9 +138,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               value={systemPrompt}
               onChange={(e) => {
                 setSystemPrompt(e.target.value);
-                if (
-                  !PERSONA_LIBRARY.find((p) => p.prompt === e.target.value)
-                ) {
+                if (!PERSONA_LIBRARY.find((p) => p.prompt === e.target.value)) {
                   setActivePersonaId("custom");
                 }
               }}

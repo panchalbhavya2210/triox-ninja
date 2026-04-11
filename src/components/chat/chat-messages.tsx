@@ -1,12 +1,30 @@
 "use client";
 
 import { useChat } from "@/lib/chat-context";
-import { Copy, Bot, User, ArrowDown, LayoutGrid, Check, Pencil, RefreshCw, X, Save, Star, Zap } from "lucide-react";
+import {
+  Copy,
+  Bot,
+  User,
+  ArrowDown,
+  LayoutGrid,
+  Check,
+  Pencil,
+  RefreshCw,
+  X,
+  Save,
+  Star,
+  Zap,
+  Wand2,
+  MessageSquareText,
+  Swords,
+  GitBranch,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEffect, useRef, useState, useMemo } from "react";
+import mermaid from "mermaid";
 import { Message } from "@/lib/types";
 import { MODELS } from "./chat-header";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +34,12 @@ type RenderBlock =
   | { type: "assistant"; message: Message }
   | { type: "spar"; messages: Message[] };
 
+export function hapticFeedback(pattern: number | number[] = 50) {
+  if (typeof window !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+}
+
 const CodeBlock = ({
   children,
   className,
@@ -24,40 +48,142 @@ const CodeBlock = ({
   className?: string;
 }) => {
   const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<"code" | "preview">("code");
 
   const onCopy = () => {
     navigator.clipboard.writeText(String(children).replace(/\n$/, ""));
     setCopied(true);
+    hapticFeedback(30);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isWebComponent =
+    className?.includes("language-html") ||
+    className?.includes("language-svg") ||
+    className?.includes("language-xml");
+  const langName = className?.replace("language-", "") || "code";
+
   return (
-    <div className="relative group/code my-4">
-      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover/code:opacity-100 transition-opacity">
+    <div className="relative group/code my-4 overflow-hidden rounded-xl border border-zinc-800/80 shadow-md bg-[#0d0d0d]">
+      <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-mono font-medium text-zinc-400 capitalize">
+            {langName}
+          </span>
+          {isWebComponent && (
+            <div className="flex bg-zinc-950 rounded-md p-0.5 border border-zinc-800 shadow-inner">
+              <button
+                onClick={() => setMode("code")}
+                className={cn(
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-all",
+                  mode === "code"
+                    ? "bg-zinc-800 shadow-sm text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
+              >
+                Code
+              </button>
+              <button
+                onClick={() => setMode("preview")}
+                className={cn(
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-all flex items-center gap-1",
+                  mode === "preview"
+                    ? "bg-[var(--icon-accent)] shadow-[0_0_10px_var(--icon-accent)] text-white"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
+              >
+                <Zap className="w-2.5 h-2.5" /> Preview
+              </button>
+            </div>
+          )}
+        </div>
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 bg-background/50 backdrop-blur-md border border-border text-muted-foreground hover:text-foreground rounded-lg"
+          className="h-6 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors"
           onClick={onCopy}
         >
           {copied ? (
-            <Check className="w-3 h-3 mr-1" />
+            <Check className="w-3 h-3 " />
           ) : (
-            <Copy className="w-3 h-3 mr-1" />
+            <Copy className="w-3 h-3 " />
           )}
-          <span className="text-[10px] font-medium">
-            {copied ? "Copied" : "Copy"}
-          </span>
         </Button>
       </div>
-      <pre
-        className={cn(
-          "overflow-x-auto p-4 rounded-xl bg-muted/30 border border-border/50 font-mono text-sm",
-          className,
-        )}
-      >
-        <code className={className}>{children}</code>
-      </pre>
+
+      {mode === "code" ? (
+        <pre
+          className={cn(
+            "overflow-x-auto p-4 font-mono text-sm text-zinc-300 m-0 custom-scrollbar",
+            className,
+          )}
+        >
+          <code className={className}>{children}</code>
+        </pre>
+      ) : (
+        <div className="bg-white relative border-t border-zinc-800 group/preview h-[400px] resize-y overflow-auto overflow-x-hidden">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/10 backdrop-blur-md px-2 py-1 rounded-full text-[10px] font-semibold text-black/50 opacity-0 group-hover/preview:opacity-100 transition-opacity pointer-events-none">
+            Interactive Preview
+          </div>
+          <iframe
+            srcDoc={String(children)}
+            className="w-full h-full min-h-[400px] border-0 outline-none"
+            sandbox="allow-scripts"
+            title="Preview"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MermaidBlock = ({ chart }: { chart: string }) => {
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "dark",
+      securityLevel: "loose",
+    });
+    const renderChart = async () => {
+      try {
+        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+        const { svg } = await mermaid.render(id, chart);
+        setSvg(svg);
+        setError(null);
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message || "Failed to render Mermaid chart");
+      }
+    };
+    renderChart();
+  }, [chart]);
+
+  if (error) {
+    return (
+      <div className="p-4 my-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-xs font-mono overflow-auto relative">
+        <div className="font-bold flex items-center gap-2 mb-2">
+          <X className="w-4 h-4" /> Mermaid Syntax Error
+        </div>
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-4 p-4 rounded-xl border border-border bg-card/50 flex justify-center overflow-x-auto shadow-sm group">
+      {svg ? (
+        <div
+          dangerouslySetInnerHTML={{ __html: svg }}
+          className="w-full h-full flex justify-center transition-opacity opacity-100"
+        />
+      ) : (
+        <div className="animate-pulse flex items-center justify-center p-8 w-full">
+          <Wand2 className="w-5 h-5 text-muted-foreground animate-bounce" />
+        </div>
+      )}
     </div>
   );
 };
@@ -70,6 +196,9 @@ export function ChatMessages() {
     regenerateMessage,
     toggleStar,
     generatingChats,
+    sendMessage,
+    isZenMode,
+    branchChat,
   } = useChat();
   const activeChat = chats.find((c) => c.id === activeChatId);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -83,9 +212,13 @@ export function ChatMessages() {
   const markdownComponents = {
     code({ node, inline, className, children, ...props }: any) {
       const match = /language-(\w+)/.exec(className || "");
-      return !inline && match ? (
-        <CodeBlock className={className}>{children}</CodeBlock>
-      ) : (
+      if (!inline && match) {
+        if (match[1] === "mermaid") {
+          return <MermaidBlock chart={String(children)} />;
+        }
+        return <CodeBlock className={className}>{children}</CodeBlock>;
+      }
+      return (
         <code className={className} {...props}>
           {children}
         </code>
@@ -104,6 +237,51 @@ export function ChatMessages() {
     const mid = editingMessageId;
     setEditingMessageId(null);
     regenerateMessage(activeChatId, mid);
+  };
+
+  const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
+  const [selectedText, setSelectedText] = useState("");
+
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    if (
+      selection &&
+      selection.toString().trim().length > 0 &&
+      !selection.isCollapsed
+    ) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        const top =
+          rect.top - containerRect.top + containerRef.current!.scrollTop;
+        const left = rect.left - containerRect.left + rect.width / 2;
+        setSelectionRect(new DOMRect(left, top, rect.width, rect.height));
+        setSelectedText(selection.toString().trim());
+      }
+    } else {
+      setSelectionRect(null);
+      setSelectedText("");
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", handleSelection);
+    return () =>
+      document.removeEventListener("selectionchange", handleSelection);
+  }, []);
+
+  const handleQuickAction = (action: "explain" | "summarize") => {
+    if (!selectedText) return;
+    hapticFeedback(40);
+    const prompt =
+      action === "explain"
+        ? `Explain this portion of text:\n\n"${selectedText}"`
+        : `Summarize this:\n\n"${selectedText}"`;
+    sendMessage(prompt);
+    setSelectionRect(null);
+    setSelectedText("");
+    window.getSelection()?.removeAllRanges();
   };
 
   const scrollToBottom = () => {
@@ -180,7 +358,41 @@ export function ChatMessages() {
       ref={containerRef}
       onScroll={handleScroll}
     >
-      <div className="max-w-4xl mx-auto space-y-8 pb-10">
+      {/* Ambient glowing background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.02, 0.05, 0.02],
+            x: [0, 50, 0],
+            y: [0, -50, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[var(--icon-accent)] blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.03, 0.08, 0.03],
+            x: [0, -50, 0],
+            y: [0, 50, 0],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "linear",
+            delay: 5,
+          }}
+          className="absolute top-[40%] -right-[10%] w-[40%] h-[60%] rounded-full bg-blue-500/20 blur-[120px]"
+        />
+      </div>
+
+      <div
+        className={cn(
+          "mx-auto space-y-8 pb-10 relative z-10 w-full transition-all duration-500",
+          isZenMode ? "max-w-6xl" : "max-w-4xl",
+        )}
+      >
         <AnimatePresence initial={false}>
           {blocks.map((block) => {
             const key =
@@ -197,8 +409,32 @@ export function ChatMessages() {
                 className="w-full"
               >
                 {block.type === "user" && (
-                  <div className="flex w-full group justify-end">
-                    <div className="flex gap-4 max-w-[85%] flex-row-reverse">
+                  <div className="flex w-full group justify-end overflow-hidden">
+                    <motion.div
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={{ left: 0.2, right: 0 }}
+                      dragSnapToOrigin={true}
+                      onDragEnd={(e, info) => {
+                        if (info.offset.x < -40) {
+                          hapticFeedback(30);
+                          handleEditOpen(block.message);
+                        }
+                      }}
+                      className="flex gap-4 max-w-[85%] flex-row-reverse w-full relative"
+                    >
+                      {/* Swipe left to edit visual indicator */}
+                      <div
+                        className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 text-muted-foreground pointer-events-none transition-opacity"
+                        style={{
+                          opacity:
+                            editingMessageId !== block.message.id
+                              ? undefined
+                              : 0,
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </div>
                       <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 border border-border mt-1 bg-secondary">
                         <User className="w-4 h-4 text-secondary-foreground" />
                       </div>
@@ -228,7 +464,8 @@ export function ChatMessages() {
                                   className="h-7 text-xs font-semibold"
                                   onClick={handleEditSave}
                                 >
-                                  <Save className="w-3 h-3 mr-1" /> Save & Submit
+                                  <Save className="w-3 h-3 mr-1" /> Save &
+                                  Submit
                                 </Button>
                               </div>
                             </div>
@@ -253,12 +490,15 @@ export function ChatMessages() {
                                 ? "text-yellow-500 hover:text-yellow-600"
                                 : "text-muted-foreground hover:text-foreground",
                             )}
-                            onClick={() =>
-                              activeChatId &&
-                              toggleStar(activeChatId, block.message.id)
-                            }
+                            onClick={() => {
+                              if (activeChatId)
+                                toggleStar(activeChatId, block.message.id);
+                              hapticFeedback();
+                            }}
                             title={
-                              block.message.isStarred ? "Unstar" : "Star message"
+                              block.message.isStarred
+                                ? "Unstar"
+                                : "Star message"
                             }
                           >
                             <Star
@@ -281,21 +521,42 @@ export function ChatMessages() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground bg-background/50 backdrop-blur-sm border shadow-sm"
-                            onClick={() =>
-                              navigator.clipboard.writeText(block.message.content)
-                            }
+                            onClick={() => {
+                              navigator.clipboard.writeText(
+                                block.message.content,
+                              );
+                              hapticFeedback(20);
+                            }}
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground bg-background/50 backdrop-blur-sm border shadow-sm"
+                            onClick={() => {
+                              if (activeChatId) {
+                                hapticFeedback();
+                                branchChat(activeChatId, block.message.id);
+                              }
+                            }}
+                            title="Branch conversation from here"
+                          >
+                            <GitBranch className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   </div>
                 )}
 
                 {block.type === "assistant" && (
                   <div className="flex w-full group justify-start">
-                    <div className="flex gap-4 max-w-[85%] flex-row">
+                    <motion.div className="flex gap-4 max-w-[85%] flex-row w-full relative">
+                      {/* Swipe right to regenerate visual indicator */}
+                      <div className="absolute -left-8 top-4 opacity-0 text-muted-foreground pointer-events-none transition-opacity">
+                        <RefreshCw className="w-4 h-4" />
+                      </div>
                       <div className="sticky top-0 max-h-max">
                         <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 border border-border mt-0 bg-muted">
                           <Bot
@@ -303,7 +564,7 @@ export function ChatMessages() {
                             style={{ color: "var(--icon-accent)" }}
                           />
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity sticky justify-start ">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity sticky justify-start flex-col">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -318,7 +579,9 @@ export function ChatMessages() {
                               toggleStar(activeChatId, block.message.id)
                             }
                             title={
-                              block.message.isStarred ? "Unstar" : "Star message"
+                              block.message.isStarred
+                                ? "Unstar"
+                                : "Star message"
                             }
                           >
                             <Star
@@ -332,10 +595,14 @@ export function ChatMessages() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground bg-background/50 backdrop-blur-sm border shadow-sm"
-                            onClick={() =>
-                              activeChatId &&
-                              regenerateMessage(activeChatId, block.message.id)
-                            }
+                            onClick={() => {
+                              if (activeChatId)
+                                regenerateMessage(
+                                  activeChatId,
+                                  block.message.id,
+                                );
+                              hapticFeedback();
+                            }}
                             disabled={isGenerating}
                             title="Regenerate response"
                           >
@@ -350,11 +617,28 @@ export function ChatMessages() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground bg-background/50 backdrop-blur-sm border shadow-sm"
-                            onClick={() =>
-                              navigator.clipboard.writeText(block.message.content)
-                            }
+                            onClick={() => {
+                              navigator.clipboard.writeText(
+                                block.message.content,
+                              );
+                              hapticFeedback(20);
+                            }}
                           >
                             <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground bg-background/50 backdrop-blur-sm border shadow-sm"
+                            onClick={() => {
+                              if (activeChatId) {
+                                hapticFeedback();
+                                branchChat(activeChatId, block.message.id);
+                              }
+                            }}
+                            title="Branch conversation from here"
+                          >
+                            <GitBranch className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
@@ -382,59 +666,91 @@ export function ChatMessages() {
                           )}
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   </div>
                 )}
 
                 {block.type === "spar" && (
-                  <div className="w-full relative py-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {block.messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className="flex flex-col min-w-0 max-w-full bg-card rounded-2xl border border-border p-4 shadow-sm group"
-                        >
-                          <div className="flex items-center justify-between mb-3 border-b border-border pb-3">
-                            <div className="flex items-center gap-2">
-                              <Bot
-                                className="w-4 h-4"
-                                style={{ color: "var(--icon-accent)" }}
-                              />
-                              <span className="text-xs font-semibold text-foreground">
-                                {getModelName(message.model)}
-                              </span>
+                  <div className="w-full relative py-4 mb-8 mt-4 bg-muted/20 rounded-3xl p-6 border border-border/50 shadow-inner">
+                    <div className="absolute -top-3 left-6 px-3 py-1 bg-background border border-border rounded-full text-[10px] uppercase font-bold tracking-widest text-[var(--icon-accent)] flex items-center gap-1.5 shadow-sm">
+                      <Swords className="w-3 h-3" /> Multi-Agent War Room
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {block.messages.map((message, idx) => {
+                        const colors = [
+                          "from-blue-500/10",
+                          "from-fuchsia-500/10",
+                          "from-emerald-500/10",
+                        ];
+                        const iconColors = [
+                          "text-blue-500",
+                          "text-fuchsia-500",
+                          "text-emerald-500",
+                        ];
+                        return (
+                          <div
+                            key={message.id}
+                            className="flex flex-col min-w-0 max-w-full bg-card rounded-2xl border border-border/80 p-5 shadow-sm group hover:shadow-md transition-shadow relative overflow-hidden"
+                          >
+                            {/* Ambient Top Gradient */}
+                            <div
+                              className={cn(
+                                "absolute top-0 left-0 w-full h-32 bg-gradient-to-b to-transparent pointer-events-none opacity-50",
+                                colors[idx % colors.length],
+                              )}
+                            />
+
+                            <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50 relative z-10">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={cn(
+                                    "p-1.5 rounded-lg bg-background border shadow-sm",
+                                    iconColors[idx % iconColors.length],
+                                  )}
+                                >
+                                  <Bot className="w-4 h-4 text-current" />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">
+                                    Agent {idx + 1}
+                                  </span>
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {getModelName(message.model)}
+                                  </span>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() =>
+                                  navigator.clipboard.writeText(message.content)
+                                }
+                                title="Copy message"
+                              >
+                                <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() =>
-                                navigator.clipboard.writeText(message.content)
-                              }
-                              title="Copy message"
-                            >
-                              <Copy className="w-3 h-3 text-muted-foreground" />
-                            </Button>
+                            <div className="prose-dark text-sm max-w-full overflow-hidden w-full break-words relative z-10">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={markdownComponents}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
                           </div>
-                          <div className="prose-dark text-sm max-w-full overflow-hidden w-full break-words">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={markdownComponents}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </motion.div>
             );
           })}
-          </AnimatePresence>
+        </AnimatePresence>
 
-          {isGenerating && (
+        {/* {isGenerating && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -458,12 +774,46 @@ export function ChatMessages() {
                 ))}
               </div>
             </motion.div>
-          )}
+          )} */}
 
-          <div ref={bottomRef} className="h-4" />
-        </div>
+        <div ref={bottomRef} className="h-4" />
+      </div>
 
-        {showScrollButton && (
+      <AnimatePresence>
+        {selectionRect && selectedText && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute z-50 flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-700/50 rounded-lg shadow-2xl backdrop-blur-xl pointer-events-auto"
+            style={{
+              top: `${selectionRect.y - 48}px`,
+              left: `${selectionRect.x}px`,
+              transform: "translateX(-50%)", // Center the tooltip
+            }}
+          >
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-3 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800"
+              onPointerDown={() => handleQuickAction("explain")}
+            >
+              <Wand2 className="w-3 h-3 mr-1.5" /> Explain
+            </Button>
+            <div className="w-[1px] h-4 bg-zinc-700" />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-3 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800"
+              onPointerDown={() => handleQuickAction("summarize")}
+            >
+              <MessageSquareText className="w-3 h-3 mr-1.5" /> Summarize
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {showScrollButton && (
         <div className="sticky bottom-6 left-1/2 -translate-x-1/2 flex justify-center z-10 pointer-events-none w-full max-w-3xl">
           <Button
             variant="outline"

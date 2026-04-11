@@ -10,7 +10,7 @@ import { useState, useMemo } from "react";
 import { SettingsDialog } from "./settings-dialog";
 
 export function ChatSidebar() {
-  const { chats, activeChatId, setActiveChatId, createChat, deleteChat, togglePin } =
+  const { chats, activeChatId, setActiveChatId, createChat, deleteChat, togglePin, isSidebarOpen, setIsSidebarOpen, isZenMode } =
     useChat();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,7 +36,10 @@ export function ChatSidebar() {
           ? "bg-secondary text-secondary-foreground border-border/50 shadow-sm"
           : "hover:bg-muted text-muted-foreground",
       )}
-      onClick={() => setActiveChatId(chat.id)}
+      onClick={() => {
+        setActiveChatId(chat.id);
+        setIsSidebarOpen(false);
+      }}
     >
       <MessageSquare className="w-4 h-4 shrink-0" />
       <div className="flex-1 truncate text-sm">{chat.title}</div>
@@ -73,8 +76,23 @@ export function ChatSidebar() {
     </div>
   );
 
+  if (isZenMode) return null;
+
   return (
-    <div className="w-64 border-r border-border bg-sidebar flex flex-col h-full shrink-0 relative">
+    <>
+      {/* Mobile Drawer Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <div className={cn(
+        "w-64 border-r border-border bg-sidebar flex flex-col h-full shrink-0 shadow-lg md:shadow-none",
+        "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
       <div className="p-4">
         <div className="flex items-center gap-2 mb-6">
           <Zap
@@ -166,5 +184,6 @@ export function ChatSidebar() {
         onClose={() => setIsSettingsOpen(false)}
       />
     </div>
+    </>
   );
 }

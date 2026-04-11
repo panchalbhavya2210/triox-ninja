@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useChat } from "@/lib/chat-context";
-import { Send, Square, Paperclip, X } from "lucide-react";
+import { Send, Square, Paperclip, X, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ChatInput() {
   const {
@@ -11,10 +12,13 @@ export function ChatInput() {
     generatingChats,
     sendMessage,
     stopGeneration,
+    isZenMode,
   } = useChat();
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,10 +53,29 @@ export function ChatInput() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || !activeChatId || isGenerating) return;
+    if ((!input.trim() && attachments.length === 0) || !activeChatId || isGenerating || isSearching) return;
 
-    const content = input.trim() || (attachments.length > 0 ? "Attached image(s)" : "");
+    let content = input.trim() || (attachments.length > 0 ? "Attached image(s)" : "");
     const currentAttachments = [...attachments];
+    
+    if (isWebSearchEnabled && input.trim()) {
+      setIsSearching(true);
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: input.trim() })
+        });
+        const data = await res.json();
+        if (data.success && data.results?.length > 0) {
+          const searchContext = data.results.map((r: any) => `Title: ${r.title}\nURL: ${r.url}\nSummary: ${r.description}`).join('\n\n');
+          content = `${content}\n\n<SEARCH_CONTEXT>\n${searchContext}\n</SEARCH_CONTEXT>\n\n<SYSTEM_INSTRUCTION>The user has requested a live web search. Use the provided SEARCH_CONTEXT to inform your answer. Always cite the URLs provided if you use the information.</SYSTEM_INSTRUCTION>`;
+        }
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+      setIsSearching(false);
+    }
     
     setInput("");
     setAttachments([]);
@@ -67,7 +90,10 @@ export function ChatInput() {
   };
 
   return (
-    <div className="p-4 bg-background/90 backdrop-blur-md border-t border-border mt-auto shrink-0 relative flex-col">
+    <div className={cn(
+      "p-4 border-t mt-auto shrink-0 relative flex-col transition-all duration-500",
+      isZenMode ? "bg-transparent border-transparent max-w-4xl mx-auto w-full mb-6" : "bg-background/90 backdrop-blur-md border-border"
+    )}>
       <div className="max-w-3xl mx-auto relative w-full">
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-3 mb-3 animate-in fade-in slide-in-from-bottom-2">
@@ -105,16 +131,31 @@ export function ChatInput() {
             multiple
             className="hidden"
           />
-          <div className="pb-1 pl-1">
+          <div className="pb-1 pl-1 flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
               title="Attach images"
             >
               <Paperclip className="w-5 h-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsWebSearchEnabled(!isWebSearchEnabled)}
+              className={cn(
+                "w-10 h-10 rounded-xl transition-colors shrink-0",
+                isWebSearchEnabled 
+                  ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+              title="Toggle Live Web Search"
+            >
+              {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5" />}
             </Button>
           </div>
           <textarea

@@ -79,6 +79,7 @@ interface ChatContextType {
     groupId?: string,
   ) => string;
   updateMessage: (chatId: string, messageId: string, content: string) => void;
+  branchChat: (chatId: string, messageId: string) => void;
   togglePin: (chatId: string) => void;
   truncateFromMessage: (chatId: string, messageId: string) => void;
   sendMessage: (
@@ -93,6 +94,10 @@ interface ChatContextType {
   setSystemPrompt: (prompt: string) => void;
   activePersonaId: string;
   setActivePersonaId: (id: string) => void;
+  isSidebarOpen: boolean;
+  setIsSidebarOpen: (isOpen: boolean) => void;
+  isZenMode: boolean;
+  setIsZenMode: (isZen: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -116,6 +121,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [cornerRounding, setCornerRounding] = useState("0.5rem"); // default
   const [systemPrompt, setSystemPrompt] = useState(PERSONA_LIBRARY[0].prompt);
   const [activePersonaId, setActivePersonaId] = useState("default");
+  
+  // UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isZenMode, setIsZenMode] = useState(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const abortControllersRef = useRef<Record<string, AbortController[]>>({});
@@ -146,6 +155,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return c;
       }),
     );
+  };
+
+  const branchChat = (chatId: string, messageId: string) => {
+    setChats((prev) => {
+      const sourceChat = prev.find((c) => c.id === chatId);
+      if (!sourceChat) return prev;
+      
+      const messageIndex = sourceChat.messages.findIndex((m) => m.id === messageId);
+      if (messageIndex === -1) return prev;
+
+      const newChatId = crypto.randomUUID();
+      const newChat: Chat = {
+        ...sourceChat,
+        id: newChatId,
+        title: `${sourceChat.title} (Branch)`,
+        isPinned: false,
+        messages: sourceChat.messages.slice(0, messageIndex + 1),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      setActiveChatId(newChatId);
+      return [newChat, ...prev];
+    });
   };
 
   const addMessage = (
@@ -578,6 +611,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         updateMessage,
         togglePin,
         truncateFromMessage,
+        branchChat,
         sendMessage,
         regenerateMessage,
         toggleStar,
@@ -586,6 +620,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setSystemPrompt,
         activePersonaId,
         setActivePersonaId,
+        isSidebarOpen,
+        setIsSidebarOpen,
+        isZenMode,
+        setIsZenMode,
       }}
     >
       {isLoaded && (
