@@ -83,6 +83,11 @@ export const MODELS = [
     name: "Qwen3 Coder 480B",
     description: "Little slow but good",
   },
+  {
+    id: "minimaxai/minimax-m2.7",
+    name: "Minimax AI 2.7",
+    description: "Little slow but good",
+  },
 ];
 
 export function ChatHeader() {
